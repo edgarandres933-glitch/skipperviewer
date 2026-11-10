@@ -1,0 +1,65 @@
+================================================================================
+          GUÍA PARA INSTALAR SKIPPER VIEW EN OTRO COMPUTADOR
+================================================================================
+
+Este paquete contiene todo el código y configuración necesarios para ejecutar
+Skipper View en cualquier otro ordenador (Windows, Mac o Linux).
+
+================================================================================
+MÉTODO 1: INSTALACIÓN RÁPIDA EN WINDOWS (RECOMENDADO - 1 SOLO CLIC)
+================================================================================
+
+1. Descomprime esta carpeta en el nuevo computador (por ejemplo en el Escritorio
+   o en Documentos).
+
+2. Haz doble clic en:
+   👉  INSTALAR-SKIPPER-VIEW.bat
+
+   Este script se encargará automáticamente de:
+   - Instalar Bun (el motor ultra rápido de ejecución) si no está instalado.
+   - Configurar el archivo .env con el token de acceso privado.
+   - Descargar e instalar todas las librerías del sistema.
+
+3. Para iniciar la aplicación en cualquier momento, solo haz doble clic en:
+   👉  INICIAR-SKIPPER-VIEW.bat
+
+   Se abrirá la consola y tu navegador web automáticamente en:
+   http://localhost:8080/
+
+================================================================================
+MÉTODO 2: INSTALACIÓN MANUAL (WINDOWS, MAC O LINUX)
+================================================================================
+
+Si prefieres hacerlo por comandos o estás en Mac/Linux:
+
+1. Instala Bun:
+   - En Windows (PowerShell):
+     powershell -c "irm bun.sh/install.ps1 | iex"
+
+   - En Mac o Linux (Terminal):
+     curl -fsSL https://bun.sh/install | bash
+
+2. Abre una terminal dentro de la carpeta del proyecto.
+
+3. Asegúrate de tener el archivo .env con el token:
+   GHL_PRIVATE_TOKEN=pit-a8674944-47b0-410d-9c27-f5c5f27f9ac5
+
+4. Instala las dependencias:
+   bun install
+
+5. Inicia el servidor:
+   bun --bun run dev
+
+6. Abre tu navegador en:
+   http://localhost:8080/
+
+================================================================================
+ACCESO DESDE CELULARES O DISPOSITIVOS EN LA MISMA RED WI-FI
+================================================================================
+
+Para ver o instalar la aplicación en celulares u otras computadoras en la
+misma red local:
+1. Averigua la dirección IP local de la computadora (ejemplo con `ipconfig`).
+2. Abre en el navegador del celular: http://[TU-IP-LOCAL]:8080/
+3. Haz clic en "Instalar aplicación" para tener la App móvil en el celular.
+================================================================================

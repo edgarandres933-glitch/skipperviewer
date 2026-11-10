@@ -1,0 +1,52 @@
+{
+  "name": "Skipper View",
+  "short_name": "Skipper",
+  "description": "Suite Comercial y Analítica para el seguimiento de leads, cursos y conversiones.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "scope": "/",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "analytics"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Leads",
+      "url": "/leads",
+      "description": "Ver leads y cursos"
+    },
+    {
+      "name": "Consolidados",
+      "url": "/consolidados",
+      "description": "Ver consolidados"
+    },
+    {
+      "name": "Analíticas",
+      "url": "/analytics",
+      "description": "Métricas y rendimiento"
+    }
+  ]
+}
