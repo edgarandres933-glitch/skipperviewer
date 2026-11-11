@@ -1,12 +1,12 @@
 import server from "../dist/server/server.js";
 
 export default async function handler(req, res) {
-  // Manejo directo si Vercel ejecuta como Web Standard (Request -> Response)
+  // En runtime Bun o Web Standard (Request -> Response)
   if (req instanceof Request || (!res && req?.url && req?.headers)) {
     return server.fetch(req);
   }
 
-  // Manejo compatible si Vercel ejecuta como Node.js clásico (IncomingMessage, ServerResponse)
+  // En caso de que se pase (req, res) estilo Node clásico
   try {
     const host = req.headers.host || "localhost";
     const protocol = req.headers["x-forwarded-proto"] || "https";
@@ -39,10 +39,10 @@ export default async function handler(req, res) {
     res.end(Buffer.from(arrayBuffer));
   } catch (error) {
     console.error("Vercel SSR Error:", error);
-    if (!res.headersSent) {
+    if (res && !res.headersSent) {
       res.statusCode = 500;
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end("Internal Server Error");
+      res.end("Internal Server Error: " + (error?.message || error));
     }
   }
 }
