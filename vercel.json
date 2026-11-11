@@ -1,5 +1,5 @@
 {
-  "outputDirectory": ".output/public",
+
   "rewrites": [
     {
       "source": "/(.*)",
