@@ -19,8 +19,5 @@ export default defineConfig({
     server: {
     allowedHosts: true, entry: "server" },
   },
-  // Enable Nitro for Vercel deployment (overrides the default cloudflare-module preset)
-  nitro: {
-    preset: "vercel",
-  },
+  nitro: false,
 });
