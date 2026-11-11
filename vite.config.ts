@@ -19,5 +19,10 @@ export default defineConfig({
     server: {
     allowedHosts: true, entry: "server" },
   },
+  vite: {
+    ssr: {
+      noExternal: true,
+    },
+  },
   nitro: false,
 });
