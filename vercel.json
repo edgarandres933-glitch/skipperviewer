@@ -6,7 +6,11 @@
   "outputDirectory": "dist/client",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/_serverFn/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/api"
     }
   ]
