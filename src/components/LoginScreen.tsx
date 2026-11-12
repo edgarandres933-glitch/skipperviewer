@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { User, Lock, Eye, EyeOff, LogIn, ShieldCheck, Sparkles, AlertCircle, KeyRound } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,12 @@ export function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__skipper_react_ready = true;
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

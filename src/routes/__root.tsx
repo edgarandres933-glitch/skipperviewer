@@ -173,6 +173,46 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         {children}
         <Scripts />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  function initLoginFormListener() {
+    var form = document.querySelector('form');
+    if (!form || form.__auth_bound) return;
+    form.__auth_bound = true;
+
+    form.addEventListener('submit', function(e) {
+      if (window.__skipper_react_ready) return;
+
+      e.preventDefault();
+      var userInput = form.querySelector('input[type="text"]');
+      var passInput = form.querySelector('input[type="password"]');
+      var user = userInput ? userInput.value.trim() : '';
+      var pass = passInput ? passInput.value.trim() : '';
+
+      var VALID_USER = 'adminSCviewer';
+      var VALID_PASS = 'SkipC@P@.%!1.';
+
+      if (user === VALID_USER && pass === VALID_PASS) {
+        localStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
+        localStorage.setItem('skipperview_auth_user', user);
+        window.location.href = '/';
+      } else {
+        alert('Usuario o contraseña incorrectos. Verifica tus credenciales.');
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLoginFormListener);
+  } else {
+    initLoginFormListener();
+  }
+})();
+`,
+          }}
+        />
       </body>
     </html>
   );

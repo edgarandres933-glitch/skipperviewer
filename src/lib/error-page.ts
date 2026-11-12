@@ -1,9 +1,13 @@
-import fallbackHtml from "./index-fallback.html?raw";
+import fs from "fs";
+import path from "path";
 
 export function renderErrorPage(): string {
-  if (fallbackHtml && fallbackHtml.length > 500) {
-    return fallbackHtml;
-  }
+  try {
+    const indexPath = path.resolve("dist/client/index.html");
+    if (fs.existsSync(indexPath)) {
+      return fs.readFileSync(indexPath, "utf8");
+    }
+  } catch {}
 
   return `<!doctype html>
 <html lang="es" class="dark">
