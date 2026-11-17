@@ -34,11 +34,15 @@ async function main() {
         let bundleCode = fs.readFileSync(clientBundlePath, "utf8");
         let patched = false;
 
-        // 1. Parche en bootstrap de TanStack: e.stores.matchesId.get() -> e?.stores?.matchesId?.get()
+        // 1. Parche en bootstrap de TanStack: e.stores.matchesId.get() -> (e?.stores?.matchesId?.get?.() || [])
         if (bundleCode.includes("e.stores.matchesId.get()")) {
-          bundleCode = bundleCode.replaceAll("e.stores.matchesId.get()", "e?.stores?.matchesId?.get() || []");
+          bundleCode = bundleCode.replaceAll("e.stores.matchesId.get()", "(e?.stores?.matchesId?.get?.() || [])");
           patched = true;
           console.log("Parcheado bootstrap hydration: e.stores.matchesId.get()");
+        } else if (bundleCode.includes("e?.stores?.matchesId?.get() || []")) {
+          bundleCode = bundleCode.replaceAll("e?.stores?.matchesId?.get() || []", "(e?.stores?.matchesId?.get?.() || [])");
+          patched = true;
+          console.log("Parcheado bootstrap hydration existente con paréntesis seguros");
         }
 
         // 2. Parche en listener pagehide: e.stores.resolvedLocation.get() -> e?.stores?.resolvedLocation?.get()
@@ -51,7 +55,37 @@ async function main() {
           console.log("Parcheado scroll restoration listener: e.stores.resolvedLocation.get()");
         }
 
-        // 3. Parche en inicialización de router: asegurar stores siempre disponible
+        // 3. Parche en resolución de rutas: e.router.stores.matchesId.get() y e.router.stores.matches.get()
+        const targetRouterMatchesId = "r=e.router.stores.matchesId.get()[n]";
+        const patchRouterMatchesId = "r=(e?.router?.stores?.matchesId?.get?.() || [])[n]";
+        if (bundleCode.includes(targetRouterMatchesId)) {
+          bundleCode = bundleCode.replace(targetRouterMatchesId, patchRouterMatchesId);
+          patched = true;
+          console.log("Parcheado router resolution: r=e.router.stores.matchesId.get()[n]");
+        }
+
+        const targetRouterMatches = "e.router.stores.matches.get()";
+        if (bundleCode.includes(targetRouterMatches)) {
+          bundleCode = bundleCode.replaceAll(targetRouterMatches, "(e?.router?.stores?.matches?.get?.() || [])");
+          patched = true;
+          console.log("Parcheado router matches: e.router.stores.matches.get()");
+        }
+
+        const targetRouterMatchStores = "e.router.stores.matchStores";
+        if (bundleCode.includes(targetRouterMatchStores)) {
+          bundleCode = bundleCode.replaceAll(targetRouterMatchStores, "(e?.router?.stores?.matchStores || new Map())");
+          patched = true;
+          console.log("Parcheado router matchStores: e.router.stores.matchStores");
+        }
+
+        const targetStoresMatchStores = "e.stores.matchStores";
+        if (bundleCode.includes(targetStoresMatchStores)) {
+          bundleCode = bundleCode.replaceAll(targetStoresMatchStores, "(e?.stores?.matchStores || new Map())");
+          patched = true;
+          console.log("Parcheado stores matchStores: e.stores.matchStores");
+        }
+
+        // 4. Parche en inicialización de router: asegurar stores siempre disponible
         const targetInit = "if(!this.stores&&this.latestLocation){";
         const targetInitPatch = "if(!this.stores){if(!this.latestLocation&&this.history)this.updateLatestLocation();";
         if (bundleCode.includes(targetInit)) {
