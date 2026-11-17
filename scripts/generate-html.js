@@ -1,192 +1,34 @@
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 
 async function main() {
   try {
-    const assetsDir = path.resolve("dist/client/assets");
-    if (!fs.existsSync(assetsDir)) {
-      console.error("dist/client/assets no existe");
-      process.exit(1);
+    const serverPath = pathToFileURL(path.resolve("dist/server/server.js")).href;
+    const serverModule = await import(serverPath);
+    const server = serverModule.default;
+    
+    // Ejecutar SSR request para generar el HTML con serialización TanStack completa
+    console.log("Invocando SSR para capturar HTML con hidratación TanStack...");
+    const res = await server.fetch(new Request("http://localhost:3000/"));
+    const html = await res.text();
+    
+    if (!html || html.length < 500) {
+      throw new Error("El SSR retornó HTML vacío o insuficiente: " + html);
     }
-
-    const files = fs.readdirSync(assetsDir);
-    const mainJs = files.find((f) => f.startsWith("index-") && f.endsWith(".js"));
-    const mainCss = files.find((f) => f.startsWith("styles-") && f.endsWith(".css"));
-
-    if (!mainJs) {
-      console.error("No se encontró index-*.js en dist/client/assets");
-      process.exit(1);
-    }
-
-    console.log(`Encontrado bundle cliente principal: /assets/${mainJs} y CSS: /assets/${mainCss}`);
-
-    // Leer el manifest generado en el servidor si existe para precargar rutas clave
-    let manifestPreloads = [];
-    try {
-      const serverAssetsDir = path.resolve("dist/server/assets");
-      if (fs.existsSync(serverAssetsDir)) {
-        const manifestFileName = fs
-          .readdirSync(serverAssetsDir)
-          .find((f) => f.startsWith("_tanstack-start-manifest_v"));
-        if (manifestFileName) {
-          const manifestModule = await import(
-            path.resolve(serverAssetsDir, manifestFileName)
-          );
-          const manifest = manifestModule.tsrStartManifest();
-          if (manifest?.routes?.__root__?.preloads) {
-            manifestPreloads = manifest.routes.__root__.preloads;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("No se pudo leer manifest server preloads:", e.message);
-    }
-
-    // Generar preload links
-    const preloadLinks = Array.from(new Set([`/assets/${mainJs}`, ...manifestPreloads]))
-      .filter((p) => p && p !== `/assets/${mainJs}`)
-      .map((p) => `    <link rel="modulepreload" href="${p}" />`)
-      .join("\n");
-
-    const cssLink = mainCss
-      ? `    <link rel="stylesheet" href="/assets/${mainCss}" />`
-      : "";
-
-    // HTML maestro universal siempre sincronizado con los hashes de este build exacto
-    const html = `<!doctype html>
-<html lang="es" class="dark">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-    <link rel="preload" as="image" href="/skipper-logo.png" />
-${cssLink}
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
-    <title>Panel de Productos y Cursos — Skipper View</title>
-    <meta name="author" content="Skipper View" />
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Skipper View" />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="description" content="Resumen de ventas, alumnos matriculados y recaudación por cada producto y curso." />
-    <meta property="og:title" content="Panel de Productos y Cursos — Skipper View" />
-    <meta property="og:description" content="Resumen de ventas, alumnos matriculados y recaudación por cada producto y curso." />
-    <link rel="modulepreload" href="/assets/${mainJs}" />
-${preloadLinks}
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/favicon.png" type="image/png" />
-    <link rel="shortcut icon" href="/favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  </head>
-  <body>
-    <div id="root">
-      <div class="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-950 px-4 py-12 selection:bg-primary/30 selection:text-white">
-        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(59,130,246,0.18),rgba(255,255,255,0))]"></div>
-        <div class="pointer-events-none absolute -bottom-40 -left-40 size-96 rounded-full bg-indigo-600/10 blur-3xl"></div>
-        <div class="pointer-events-none absolute -right-40 -top-40 size-96 rounded-full bg-cyan-500/10 blur-3xl"></div>
-        <div class="relative z-10 w-full max-w-md rounded-2xl border border-slate-800/80 bg-slate-900/70 p-8 shadow-2xl backdrop-blur-xl transition-all sm:p-10">
-          <div class="mb-8 flex flex-col items-center text-center">
-            <div class="group relative mb-4 flex size-16 items-center justify-center rounded-2xl bg-white p-2 shadow-lg shadow-primary/20 ring-1 ring-white/20 transition-transform hover:scale-105">
-              <img src="/skipper-logo.png" alt="Skipper View" class="size-full object-contain" />
-              <div class="absolute -inset-1 -z-10 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 opacity-20 blur group-hover:opacity-40 transition-opacity"></div>
-            </div>
-            <h1 class="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">Skipper View</h1>
-            <p class="mt-1 text-xs font-medium text-slate-400">Suite Comercial &amp; Analítica de Alto Rendimiento</p>
-            <div class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check size-3.5 text-blue-400"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
-              <span>Acceso Seguro y Privado</span>
-            </div>
-          </div>
-          <form class="space-y-5" onsubmit="window.__skipper_submit && window.__skipper_submit(event)">
-            <div class="space-y-1.5 text-left">
-              <label class="text-xs font-semibold text-slate-300">Usuario de acceso</label>
-              <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user size-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                </div>
-                <input id="user-input" type="text" autocomplete="username" placeholder="Ingresa tu usuario" class="h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/60 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:bg-slate-950/90 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" value="" />
-              </div>
-            </div>
-            <div class="space-y-1.5 text-left">
-              <label class="text-xs font-semibold text-slate-300">Contraseña</label>
-              <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock size-4"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                </div>
-                <input id="pass-input" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" class="h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/60 pl-10 pr-11 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:bg-slate-950/90 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-sans" value="" />
-              </div>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <label class="flex items-center gap-2 cursor-pointer select-none text-slate-300">
-                <input type="checkbox" class="size-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500/30" checked />
-                <span>Recordar sesión</span>
-              </label>
-              <span class="text-[11px] text-slate-500">Panel Administrativo</span>
-            </div>
-            <button type="submit" class="group relative flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-500 hover:to-indigo-500 hover:shadow-blue-600/40 active:scale-[0.98]">
-              <span>Ingresar al Sistema</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-in size-4 transition-transform group-hover:translate-x-0.5"><path d="m10 17 5-5-5-5"></path><path d="M15 12H3"></path><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path></svg>
-            </button>
-          </form>
-          <div class="mt-8 border-t border-slate-800/80 pt-4 text-center">
-            <p class="text-[11px] text-slate-500">Skipper View © 2026 · Todos los derechos reservados</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Script de autenticación inmediata y fallback -->
-    <script>
-      window.__skipper_submit = function(e) {
-        if (e) e.preventDefault();
-        var u = document.getElementById('user-input');
-        var p = document.getElementById('pass-input');
-        var user = u ? u.value.trim() : '';
-        var pass = p ? p.value.trim() : '';
-        if (user === 'adminSCviewer' && pass === 'SkipC@P@.%!1.') {
-          localStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
-          localStorage.setItem('skipperview_auth_user', user);
-          sessionStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
-          sessionStorage.setItem('skipperview_auth_user', user);
-          window.location.reload();
-        } else {
-          alert('Usuario o contraseña incorrectos. Verifica tus credenciales.');
-        }
-      };
-
-      (function() {
-        var token = localStorage.getItem('skipperview_auth_token') || sessionStorage.getItem('skipperview_auth_token');
-        if (token === 'authenticated_session_active') {
-          // Ya autenticado
-          var root = document.getElementById('root');
-          if (root && !window.__skipper_react_ready) {
-            root.innerHTML = '<div style="display:flex;height:100vh;align-items:center;justify-content:center;background:#020617;color:#fff;font-family:sans-serif;"><div style="text-align:center;"><div style="width:40px;height:40px;border:3px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div><div>Cargando Skipper View...</div></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-          }
-        }
-      })();
-    </script>
-
-    <!-- Módulo de carga de TanStack Router / React SPA con el HASH EXACTO ACTUAL -->
-    <script type="module" src="/assets/${mainJs}"></script>
-  </body>
-</html>`;
 
     const outPath = path.resolve("dist/client/index.html");
     fs.writeFileSync(outPath, html, "utf8");
-    console.log(`Generado exitosamente dist/client/index.html sincronizado (${html.length} bytes)`);
+    console.log(`Generado con éxito dist/client/index.html (${html.length} bytes)`);
 
-    // Sincronizar también con src/lib/index-fallback.html para SSR
-    const fallbackPath = path.resolve("src/lib/index-fallback.html");
-    fs.writeFileSync(fallbackPath, html, "utf8");
-    console.log(`Sincronizado src/lib/index-fallback.html`);
+    // Sincronizar fallback interno y public
+    fs.writeFileSync(path.resolve("src/lib/index-fallback.html"), html, "utf8");
+    fs.writeFileSync(path.resolve("public/index.html"), html, "utf8");
+    console.log("Sincronizado public/index.html y src/lib/index-fallback.html");
 
     process.exit(0);
   } catch (err) {
-    console.error("Error al generar index.html:", err);
+    console.error("Error al pre-renderizar index.html:", err);
     process.exit(1);
   }
 }
