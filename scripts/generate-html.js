@@ -34,7 +34,7 @@ async function main() {
         let bundleCode = fs.readFileSync(clientBundlePath, "utf8");
         let patched = false;
 
-        // 1. Parche en bootstrap de TanStack: e.stores.matchesId.get() -> (e?.stores?.matchesId?.get?.() || [])
+        // 1. Parche en bootstrap de TanStack: e.stores.matchesId.get() o e.stores.ids.get()
         if (bundleCode.includes("e.stores.matchesId.get()")) {
           bundleCode = bundleCode.replaceAll("e.stores.matchesId.get()", "(e?.stores?.matchesId?.get?.() || [])");
           patched = true;
@@ -43,6 +43,11 @@ async function main() {
           bundleCode = bundleCode.replaceAll("e?.stores?.matchesId?.get() || []", "(e?.stores?.matchesId?.get?.() || [])");
           patched = true;
           console.log("Parcheado bootstrap hydration existente con paréntesis seguros");
+        }
+        if (bundleCode.includes("e.stores.ids.get()")) {
+          bundleCode = bundleCode.replaceAll("e.stores.ids.get()", "(e?.stores?.ids?.get?.() || e?.stores?.matchesId?.get?.() || [])");
+          patched = true;
+          console.log("Parcheado bootstrap hydration: e.stores.ids.get()");
         }
 
         // 2. Parche en listener pagehide: e.stores.resolvedLocation.get() -> e?.stores?.resolvedLocation?.get()
@@ -55,7 +60,12 @@ async function main() {
           console.log("Parcheado scroll restoration listener: e.stores.resolvedLocation.get()");
         }
 
-        // 3. Parche en resolución de rutas: e.router.stores.matchesId.get() y e.router.stores.matches.get()
+        // 3. Parche en resolución de rutas: e.router.stores.matchesId.get()
+        if (bundleCode.includes("e.router.stores.matchesId.get()")) {
+          bundleCode = bundleCode.replaceAll("e.router.stores.matchesId.get()", "(e?.router?.stores?.matchesId?.get?.() || [])");
+          patched = true;
+          console.log("Parcheado global router resolution: e.router.stores.matchesId.get()");
+        }
         const targetRouterMatchesId = "r=e.router.stores.matchesId.get()[n]";
         const patchRouterMatchesId = "r=(e?.router?.stores?.matchesId?.get?.() || [])[n]";
         if (bundleCode.includes(targetRouterMatchesId)) {
