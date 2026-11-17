@@ -28,6 +28,42 @@ async function main() {
         console.log(`Detectado bundle principal: ${realIndexJs}`);
         // Reemplazar cualquier referencia previa a index-*.js por el hash real actual
         html = html.replace(/\/assets\/index-[A-Za-z0-9_-]+\.js/g, `/assets/${realIndexJs}`);
+
+        // Parchear con seguridad los accesos a stores en el bundle del cliente para prevenir TypeError (reading 'get')
+        const clientBundlePath = path.join(assetsDir, realIndexJs);
+        let bundleCode = fs.readFileSync(clientBundlePath, "utf8");
+        let patched = false;
+
+        // 1. Parche en bootstrap de TanStack: e.stores.matchesId.get() -> e?.stores?.matchesId?.get()
+        if (bundleCode.includes("e.stores.matchesId.get()")) {
+          bundleCode = bundleCode.replaceAll("e.stores.matchesId.get()", "e?.stores?.matchesId?.get() || []");
+          patched = true;
+          console.log("Parcheado bootstrap hydration: e.stores.matchesId.get()");
+        }
+
+        // 2. Parche en listener pagehide: e.stores.resolvedLocation.get() -> e?.stores?.resolvedLocation?.get()
+        if (bundleCode.includes("e.stores.resolvedLocation.get()")) {
+          bundleCode = bundleCode.replaceAll(
+            "e.stores.resolvedLocation.get()??e.stores.location.get()",
+            "e?.stores?.resolvedLocation?.get?.()??e?.stores?.location?.get?.()"
+          );
+          patched = true;
+          console.log("Parcheado scroll restoration listener: e.stores.resolvedLocation.get()");
+        }
+
+        // 3. Parche en inicialización de router: asegurar stores siempre disponible
+        const targetInit = "if(!this.stores&&this.latestLocation){";
+        const targetInitPatch = "if(!this.stores){if(!this.latestLocation&&this.history)this.updateLatestLocation();";
+        if (bundleCode.includes(targetInit)) {
+          bundleCode = bundleCode.replace(targetInit, targetInitPatch);
+          patched = true;
+          console.log("Parcheado Router.stores eager initialization");
+        }
+
+        if (patched) {
+          fs.writeFileSync(clientBundlePath, bundleCode, "utf8");
+          console.log(`Bundle del cliente ${realIndexJs} protegido y guardado.`);
+        }
       }
       if (realStylesCss) {
         console.log(`Detectado CSS principal: ${realStylesCss}`);
