@@ -177,31 +177,42 @@ function RootShell({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{
             __html: `
 (function() {
+  function doLogin(e) {
+    var form = document.querySelector('form');
+    if (!form) return;
+    var userInput = form.querySelector('input[type="text"]');
+    var passInput = form.querySelector('input[type="password"]');
+    var user = userInput ? userInput.value.trim() : '';
+    var pass = passInput ? passInput.value.trim() : '';
+
+    var VALID_USER = 'adminSCviewer';
+    var VALID_PASS = 'SkipC@P@.%!1.';
+
+    if (user === VALID_USER && pass === VALID_PASS) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      localStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
+      localStorage.setItem('skipperview_auth_user', user);
+      sessionStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
+      sessionStorage.setItem('skipperview_auth_user', user);
+      window.location.href = '/';
+    } else if (user || pass) {
+      alert('Usuario o contraseña incorrectos. Verifica tus credenciales.');
+    }
+  }
+
   function initLoginFormListener() {
     var form = document.querySelector('form');
     if (!form || form.__auth_bound) return;
     form.__auth_bound = true;
 
-    form.addEventListener('submit', function(e) {
-      if (window.__skipper_react_ready) return;
-
-      e.preventDefault();
-      var userInput = form.querySelector('input[type="text"]');
-      var passInput = form.querySelector('input[type="password"]');
-      var user = userInput ? userInput.value.trim() : '';
-      var pass = passInput ? passInput.value.trim() : '';
-
-      var VALID_USER = 'adminSCviewer';
-      var VALID_PASS = 'SkipC@P@.%!1.';
-
-      if (user === VALID_USER && pass === VALID_PASS) {
-        localStorage.setItem('skipperview_auth_token', 'authenticated_session_active');
-        localStorage.setItem('skipperview_auth_user', user);
-        window.location.href = '/';
-      } else {
-        alert('Usuario o contraseña incorrectos. Verifica tus credenciales.');
-      }
-    });
+    form.addEventListener('submit', doLogin);
+    var btn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+    if (btn) {
+      btn.addEventListener('click', doLogin);
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -209,6 +220,7 @@ function RootShell({ children }: { children: ReactNode }) {
   } else {
     initLoginFormListener();
   }
+  setInterval(initLoginFormListener, 500);
 })();
 `,
           }}
