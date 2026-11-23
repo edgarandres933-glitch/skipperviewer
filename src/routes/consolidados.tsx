@@ -34,6 +34,8 @@ import {
   Sparkles,
   Clock,
   Filter,
+  UserCheck,
+  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -167,6 +169,9 @@ function ConsolidadosPage() {
   const { data: dataset, isPending } = useDashboardQuery();
   const [selectedCourseKey, setSelectedCourseKey] = useState<string>("Marketing Digital");
   const [studentSearch, setStudentSearch] = useState("");
+  const [selectedAdvisorName, setSelectedAdvisorName] = useState<string | null>(null);
+  const [advisorLeadSearch, setAdvisorLeadSearch] = useState("");
+  const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
 
   const allLeads = dataset?.leads ?? [];
 
@@ -340,6 +345,145 @@ function ConsolidadosPage() {
   const globalConversion = grandTotal.totalLeads
     ? ((grandTotal.wonLeads / grandTotal.totalLeads) * 100).toFixed(1)
     : "0.0";
+
+  // CONSOLIDACIÓN POR ASESOR: LEADS ASIGNADOS, ESTADOS Y RENDIMIENTO
+  const consolidatedByAdvisor = useMemo(() => {
+    const advMap = new Map<
+      string,
+      {
+        name: string;
+        totalLeads: number;
+        wonLeads: number;
+        inProgressLeads: number;
+        lostLeads: number;
+        revenue: number;
+        saldoPendiente: number;
+        projectedRevenue: number;
+        courses: Map<string, number>;
+        leads: any[];
+      }
+    >();
+
+    for (const l of rangeLeads) {
+      const advName = l.ownerName?.trim() || "Sin asignar";
+      if (!advMap.has(advName)) {
+        advMap.set(advName, {
+          name: advName,
+          totalLeads: 0,
+          wonLeads: 0,
+          inProgressLeads: 0,
+          lostLeads: 0,
+          revenue: 0,
+          saldoPendiente: 0,
+          projectedRevenue: 0,
+          courses: new Map(),
+          leads: [],
+        });
+      }
+
+      const stat = advMap.get(advName)!;
+      stat.totalLeads++;
+
+      const isWon =
+        l.status === "Calificado" || l.oppStatus?.toLowerCase() === "won";
+      const isLost =
+        l.status === "Perdido" || l.oppStatus?.toLowerCase() === "lost";
+
+      let outcome: "Ganado" | "Perdido" | "En proceso" = "En proceso";
+      if (isWon) {
+        outcome = "Ganado";
+        stat.wonLeads++;
+        const paid = Number(l.deposit || l.total || 0);
+        const saldo = Number(l.saldo || 0);
+        stat.revenue += paid;
+        stat.saldoPendiente += saldo;
+        stat.projectedRevenue += Number(l.total || paid + saldo || 0);
+      } else if (isLost) {
+        outcome = "Perdido";
+        stat.lostLeads++;
+      } else {
+        outcome = "En proceso";
+        stat.inProgressLeads++;
+      }
+
+      const courseName = l.course || "Sin curso especificado";
+      stat.courses.set(courseName, (stat.courses.get(courseName) || 0) + 1);
+
+      stat.leads.push({
+        ...l,
+        outcome,
+        paid: Number(l.deposit || l.total || 0),
+        saldo: Number(l.saldo || 0),
+      });
+    }
+
+    return Array.from(advMap.values())
+      .map((a) => ({
+        ...a,
+        convRate: a.totalLeads ? ((a.wonLeads / a.totalLeads) * 100).toFixed(1) : "0.0",
+        coursesList: Array.from(a.courses.entries()).map(([c, count]) => ({
+          course: c,
+          count,
+        })),
+      }))
+      .sort((a, b) => b.totalLeads - a.totalLeads);
+  }, [rangeLeads]);
+
+  // Asesor activo seleccionado para ver el desglose de sus leads
+  const activeAdvisor = useMemo(() => {
+    if (!selectedAdvisorName && consolidatedByAdvisor.length > 0) {
+      return consolidatedByAdvisor[0];
+    }
+    return (
+      consolidatedByAdvisor.find((a) => a.name === selectedAdvisorName) ||
+      consolidatedByAdvisor[0] ||
+      null
+    );
+  }, [consolidatedByAdvisor, selectedAdvisorName]);
+
+  // Leads del asesor seleccionado filtrados por búsqueda y estado
+  const filteredAdvisorLeads = useMemo(() => {
+    if (!activeAdvisor) return [];
+    let list = activeAdvisor.leads;
+
+    if (advisorStatusFilter !== "all") {
+      list = list.filter((l) => l.outcome === advisorStatusFilter);
+    }
+
+    const q = advisorLeadSearch.toLowerCase().trim();
+    if (!q) return list;
+
+    return list.filter(
+      (l: any) =>
+        (l.name && l.name.toLowerCase().includes(q)) ||
+        (l.email && l.email.toLowerCase().includes(q)) ||
+        (l.phone && l.phone.toLowerCase().includes(q)) ||
+        (l.course && l.course.toLowerCase().includes(q)) ||
+        (l.source && l.source.toLowerCase().includes(q)),
+    );
+  }, [activeAdvisor, advisorLeadSearch, advisorStatusFilter]);
+
+  // Totales de asesores consolidados
+  const advisorTotals = useMemo(() => {
+    return consolidatedByAdvisor.reduce(
+      (acc, a) => ({
+        totalLeads: acc.totalLeads + a.totalLeads,
+        wonLeads: acc.wonLeads + a.wonLeads,
+        inProgressLeads: acc.inProgressLeads + a.inProgressLeads,
+        lostLeads: acc.lostLeads + a.lostLeads,
+        revenue: acc.revenue + a.revenue,
+        saldoPendiente: acc.saldoPendiente + a.saldoPendiente,
+      }),
+      {
+        totalLeads: 0,
+        wonLeads: 0,
+        inProgressLeads: 0,
+        lostLeads: 0,
+        revenue: 0,
+        saldoPendiente: 0,
+      },
+    );
+  }, [consolidatedByAdvisor]);
 
   // Curso actualmente seleccionado para inspeccionar su ficha consolidada
   const activeCourse = useMemo(() => {
@@ -756,7 +900,356 @@ function ConsolidadosPage() {
         </Card>
       </div>
 
-      {/* SECCIÓN 2: GRÁFICOS CONSOLIDADOS COMPARATIVOS */}
+      {/* SECCIÓN 1.5: CONSOLIDADO POR ASESOR: LEADS ASIGNADOS Y RENDIMIENTO */}
+      <div className="mt-6">
+        <Card
+          title="Consolidado por Asesor: Leads Asignados y Rendimiento"
+          subtitle="Total de leads asignados por asesor comercial, conversión a matrículas, estados de prospectos y facturación"
+          icon={Users}
+          action={
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                <UserCheck className="size-3.5" /> {consolidatedByAdvisor.length} Asesores activos
+              </span>
+            </div>
+          }
+        >
+          {/* Tabla de Asesores y Leads Asignados */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border/70 text-left text-muted-foreground">
+                  <th className="pb-3 font-medium">Asesor Comercial</th>
+                  <th className="pb-3 font-medium text-center">
+                    <ExplainTooltip
+                      title="Total de Leads Asignados"
+                      description="Todos los prospectos asignados a este asesor en el período seleccionado, independientemente del estado."
+                    >
+                      <span className="cursor-help border-b border-dotted border-muted-foreground/50">
+                        Leads Asignados
+                      </span>
+                    </ExplainTooltip>
+                  </th>
+                  <th className="pb-3 font-medium text-center">Ganados (Matrículas)</th>
+                  <th className="pb-3 font-medium text-center">En Proceso</th>
+                  <th className="pb-3 font-medium text-center">Perdidos</th>
+                  <th className="pb-3 font-medium text-center">Tasa Cierre</th>
+                  <th className="pb-3 font-medium text-right">Recaudación Cobrada ($)</th>
+                  <th className="pb-3 font-medium text-right text-amber-600 dark:text-amber-400">
+                    Saldo x Cobrar ($)
+                  </th>
+                  <th className="pb-3 font-medium text-center">Cursos con Ventas</th>
+                  <th className="pb-3 font-medium text-center">Listado de Leads</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {consolidatedByAdvisor.map((adv) => {
+                  const isSelected = activeAdvisor?.name === adv.name;
+                  return (
+                    <tr
+                      key={adv.name}
+                      onClick={() => setSelectedAdvisorName(adv.name)}
+                      className={cn(
+                        "cursor-pointer transition-colors hover:bg-muted/40",
+                        isSelected && "bg-primary/10 hover:bg-primary/15 font-semibold",
+                      )}
+                    >
+                      {/* Nombre del Asesor */}
+                      <td className="py-3.5 pr-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary font-bold text-xs">
+                            {adv.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground text-xs">{adv.name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {adv.wonLeads} {adv.wonLeads === 1 ? "cierre exitoso" : "cierres exitosos"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Total Leads Asignados */}
+                      <td className="py-3.5 text-center">
+                        <span className="inline-flex items-center justify-center rounded-md bg-muted px-2.5 py-1 font-mono font-bold text-foreground text-xs">
+                          {adv.totalLeads.toLocaleString()}
+                        </span>
+                      </td>
+
+                      {/* Ganados */}
+                      <td className="py-3.5 text-center">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-emerald-600 dark:text-emerald-400 font-bold font-mono">
+                          <CheckCircle2 className="size-3" />
+                          {adv.wonLeads}
+                        </span>
+                      </td>
+
+                      {/* En Proceso */}
+                      <td className="py-3.5 text-center">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-sky-600 dark:text-sky-400 font-medium font-mono">
+                          <Clock className="size-3" />
+                          {adv.inProgressLeads}
+                        </span>
+                      </td>
+
+                      {/* Perdidos */}
+                      <td className="py-3.5 text-center">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/15 px-2 py-0.5 text-rose-600 dark:text-rose-400 font-medium font-mono">
+                          <XCircle className="size-3" />
+                          {adv.lostLeads}
+                        </span>
+                      </td>
+
+                      {/* Tasa de Cierre */}
+                      <td className="py-3.5 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {adv.convRate}%
+                      </td>
+
+                      {/* Recaudado */}
+                      <td className="py-3.5 text-right font-display font-bold text-foreground text-sm">
+                        ${adv.revenue.toLocaleString()}
+                      </td>
+
+                      {/* Saldo Pendiente */}
+                      <td className="py-3.5 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
+                        {adv.saldoPendiente > 0 ? `$${adv.saldoPendiente.toLocaleString()}` : "—"}
+                      </td>
+
+                      {/* Cursos con Asignaciones */}
+                      <td className="py-3.5 text-center">
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {adv.coursesList.length} {adv.coursesList.length === 1 ? "curso" : "cursos"}
+                        </span>
+                      </td>
+
+                      {/* Acción: Ver leads */}
+                      <td className="py-3.5 text-center">
+                        <Button
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          className="h-6 px-2.5 text-[10px] gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAdvisorName(adv.name);
+                          }}
+                        >
+                          {isSelected ? "Viendo leads" : "Ver leads"}
+                          <ChevronRight className="size-3" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+              {/* Totales de Asesores */}
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold text-xs bg-muted/30 text-foreground">
+                  <td className="py-3.5 pl-2 font-display text-sm text-foreground flex items-center gap-1.5">
+                    <Users className="size-4 text-primary" />
+                    TOTAL ASESORES
+                  </td>
+                  <td className="py-3.5 text-center font-mono text-sm font-extrabold text-foreground">
+                    {advisorTotals.totalLeads.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-center font-mono text-emerald-600 dark:text-emerald-400 text-sm">
+                    {advisorTotals.wonLeads.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-center font-mono text-sky-600 dark:text-sky-400">
+                    {advisorTotals.inProgressLeads.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-center font-mono text-rose-600 dark:text-rose-400">
+                    {advisorTotals.lostLeads.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-center font-mono text-emerald-600 dark:text-emerald-400">
+                    {advisorTotals.totalLeads
+                      ? ((advisorTotals.wonLeads / advisorTotals.totalLeads) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </td>
+                  <td className="py-3.5 text-right font-display text-base text-foreground font-extrabold">
+                    ${advisorTotals.revenue.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-right font-mono text-amber-600 dark:text-amber-400 font-bold">
+                    ${advisorTotals.saldoPendiente.toLocaleString()}
+                  </td>
+                  <td className="py-3.5 text-center text-muted-foreground text-[10px]" colSpan={2}>
+                    Consolidado
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* LISTADO DE LEADS ASIGNADOS AL ASESOR SELECCIONADO */}
+          {activeAdvisor && (
+            <div className="mt-5 rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-7 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-xs">
+                    {activeAdvisor.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      Listado de Leads Asignados a:{" "}
+                      <span className="text-primary">{activeAdvisor.name}</span>
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      Mostrando {filteredAdvisorLeads.length} de {activeAdvisor.totalLeads} prospectos asignados
+                      en el período ({activeAdvisor.wonLeads} ganados, {activeAdvisor.inProgressLeads} en proceso, {activeAdvisor.lostLeads} perdidos)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filtros de Estado y Buscador */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Píldoras de filtro por estado */}
+                  <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
+                    <button
+                      onClick={() => setAdvisorStatusFilter("all")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        advisorStatusFilter === "all"
+                          ? "bg-background text-foreground shadow-2xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Todos ({activeAdvisor.totalLeads})
+                    </button>
+                    <button
+                      onClick={() => setAdvisorStatusFilter("Ganado")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        advisorStatusFilter === "Ganado"
+                          ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Ganados ({activeAdvisor.wonLeads})
+                    </button>
+                    <button
+                      onClick={() => setAdvisorStatusFilter("En proceso")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        advisorStatusFilter === "En proceso"
+                          ? "bg-sky-500/20 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      En Proceso ({activeAdvisor.inProgressLeads})
+                    </button>
+                    <button
+                      onClick={() => setAdvisorStatusFilter("Perdido")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        advisorStatusFilter === "Perdido"
+                          ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 shadow-2xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Perdidos ({activeAdvisor.lostLeads})
+                    </button>
+                  </div>
+
+                  {/* Input de Búsqueda de Leads del Asesor */}
+                  <div className="relative min-w-[200px]">
+                    <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={advisorLeadSearch}
+                      onChange={(e) => setAdvisorLeadSearch(e.target.value)}
+                      placeholder="Buscar por nombre, curso, teléfono..."
+                      className="h-8 w-full rounded-md border border-input bg-muted/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabla de los Leads Asignados */}
+              <div className="mt-3 overflow-x-auto rounded-lg border border-border/70">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-muted/30 text-left text-muted-foreground">
+                      <th className="py-2.5 px-3 font-medium">Lead / Prospecto</th>
+                      <th className="py-2.5 px-3 font-medium">Fecha</th>
+                      <th className="py-2.5 px-3 font-medium">Curso de Interés</th>
+                      <th className="py-2.5 px-3 font-medium text-center">Estado Lead</th>
+                      <th className="py-2.5 px-3 font-medium">Modalidad</th>
+                      <th className="py-2.5 px-3 font-medium">Canal de Origen</th>
+                      <th className="py-2.5 px-3 font-medium text-right">Recaudado</th>
+                      <th className="py-2.5 px-3 font-medium text-right">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {filteredAdvisorLeads.map((lead: any) => (
+                      <tr key={lead.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 px-3 font-medium text-foreground">
+                          <p className="font-semibold">{lead.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {lead.email || lead.phone || "Sin contacto"}
+                          </p>
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px]">
+                          {lead.oppDate || lead.date || "—"}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <BookOpen className="size-3 text-primary" />
+                            {lead.course || "General"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold",
+                              lead.outcome === "Ganado" &&
+                                "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                              lead.outcome === "En proceso" &&
+                                "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+                              lead.outcome === "Perdido" &&
+                                "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+                            )}
+                          >
+                            {lead.outcome === "Ganado" && <CheckCircle2 className="size-3" />}
+                            {lead.outcome === "En proceso" && <Clock className="size-3" />}
+                            {lead.outcome === "Perdido" && <XCircle className="size-3" />}
+                            {lead.outcome}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            {lead.modality === "Presencial" ? (
+                              <Building2 className="size-3 text-emerald-500" />
+                            ) : (
+                              <Laptop className="size-3 text-purple-500" />
+                            )}
+                            {lead.modality || "—"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground text-[11px]">
+                          {lead.source || "Directo"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">
+                          {lead.paid > 0 ? `$${lead.paid.toLocaleString()}` : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
+                          {lead.saldo > 0 ? `$${lead.saldo.toLocaleString()}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredAdvisorLeads.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">
+                          No se encontraron leads para este asesor con los filtros aplicados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Gráfico 1: Facturación Recaudada vs Saldo por Cobrar */}
         <Card
