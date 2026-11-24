@@ -173,6 +173,7 @@ function ConsolidadosPage() {
   const [selectedAdvisorName, setSelectedAdvisorName] = useState<string | null>(null);
   const [advisorLeadSearch, setAdvisorLeadSearch] = useState("");
   const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
+  const [advisorCourseFilter, setAdvisorCourseFilter] = useState<string>("all");
 
   const allLeads = dataset?.leads ?? [];
 
@@ -442,13 +443,30 @@ function ConsolidadosPage() {
     );
   }, [consolidatedByAdvisor, selectedAdvisorName]);
 
-  // Leads del asesor seleccionado filtrados por búsqueda y estado
+  // Cursos únicos con conteo en los leads del asesor activo
+  const activeAdvisorCourses = useMemo(() => {
+    if (!activeAdvisor) return [];
+    const courseMap = new Map<string, number>();
+    for (const l of activeAdvisor.leads) {
+      const c = l.course || "Sin curso especificado";
+      courseMap.set(c, (courseMap.get(c) || 0) + 1);
+    }
+    return Array.from(courseMap.entries())
+      .map(([course, count]) => ({ course, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [activeAdvisor]);
+
+  // Leads del asesor seleccionado filtrados por búsqueda, estado y curso
   const filteredAdvisorLeads = useMemo(() => {
     if (!activeAdvisor) return [];
     let list = activeAdvisor.leads;
 
     if (advisorStatusFilter !== "all") {
       list = list.filter((l) => l.outcome === advisorStatusFilter);
+    }
+
+    if (advisorCourseFilter !== "all") {
+      list = list.filter((l) => (l.course || "Sin curso especificado") === advisorCourseFilter);
     }
 
     const q = advisorLeadSearch.toLowerCase().trim();
@@ -462,7 +480,7 @@ function ConsolidadosPage() {
         (l.course && l.course.toLowerCase().includes(q)) ||
         (l.source && l.source.toLowerCase().includes(q)),
     );
-  }, [activeAdvisor, advisorLeadSearch, advisorStatusFilter]);
+  }, [activeAdvisor, advisorLeadSearch, advisorStatusFilter, advisorCourseFilter]);
 
   // Totales de asesores consolidados
   const advisorTotals = useMemo(() => {
@@ -1043,6 +1061,11 @@ function ConsolidadosPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedAdvisorName(adv.name);
+                            setAdvisorCourseFilter("all");
+                            const el = document.getElementById("listado-leads-asesor");
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
                           }}
                         >
                           {isSelected ? "Viendo leads" : "Ver leads"}
@@ -1095,7 +1118,7 @@ function ConsolidadosPage() {
 
           {/* LISTADO DE LEADS ASIGNADOS AL ASESOR SELECCIONADO */}
           {activeAdvisor && (
-            <div className="mt-5 rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+            <div id="listado-leads-asesor" className="mt-5 rounded-xl border border-border/70 bg-card p-4 shadow-2xs scroll-mt-6">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="flex size-7 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-xs">
@@ -1107,14 +1130,35 @@ function ConsolidadosPage() {
                       <span className="text-primary">{activeAdvisor.name}</span>
                     </h4>
                     <p className="text-[11px] text-muted-foreground">
-                      Mostrando {filteredAdvisorLeads.length} de {activeAdvisor.totalLeads} prospectos asignados
+                      Mostrando <strong className="text-foreground">{filteredAdvisorLeads.length}</strong> de {activeAdvisor.totalLeads} prospectos asignados
                       en el período ({activeAdvisor.wonLeads} ganados, {activeAdvisor.inProgressLeads} en proceso, {activeAdvisor.lostLeads} perdidos)
                     </p>
                   </div>
                 </div>
 
-                {/* Filtros de Estado y Buscador */}
+                {/* Filtros de Curso, Estado y Buscador */}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Selector de Filtro por Curso */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline">
+                      Curso:
+                    </span>
+                    <select
+                      value={advisorCourseFilter}
+                      onChange={(e) => setAdvisorCourseFilter(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-muted/40 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="all">
+                        Todos los cursos ({activeAdvisor.totalLeads} leads)
+                      </option>
+                      {activeAdvisorCourses.map((c) => (
+                        <option key={c.course} value={c.course}>
+                          {c.course} ({c.count} {c.count === 1 ? "lead" : "leads"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Píldoras de filtro por estado */}
                   <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
                     <button
@@ -1169,12 +1213,58 @@ function ConsolidadosPage() {
                     <input
                       value={advisorLeadSearch}
                       onChange={(e) => setAdvisorLeadSearch(e.target.value)}
-                      placeholder="Buscar por nombre, curso, teléfono..."
+                      placeholder="Buscar por nombre, teléfono, curso..."
                       className="h-8 w-full rounded-md border border-input bg-muted/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Barra de estado del filtro activo */}
+              {(advisorCourseFilter !== "all" || advisorStatusFilter !== "all" || advisorLeadSearch) && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-medium text-muted-foreground">Filtros aplicados:</span>
+                  {advisorCourseFilter !== "all" && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      Curso: {advisorCourseFilter}
+                      <button
+                        onClick={() => setAdvisorCourseFilter("all")}
+                        className="hover:opacity-75 font-bold ml-0.5"
+                        title="Quitar filtro de curso"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {advisorStatusFilter !== "all" && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                      Estado: {advisorStatusFilter}
+                      <button
+                        onClick={() => setAdvisorStatusFilter("all")}
+                        className="hover:opacity-75 font-bold ml-0.5"
+                        title="Quitar filtro de estado"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {advisorLeadSearch && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                      Búsqueda: &ldquo;{advisorLeadSearch}&rdquo;
+                      <button
+                        onClick={() => setAdvisorLeadSearch("")}
+                        className="hover:opacity-75 font-bold ml-0.5"
+                        title="Limpiar búsqueda"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  <span className="text-[11px] font-bold text-foreground ml-auto">
+                    Total coincidente: {filteredAdvisorLeads.length} {filteredAdvisorLeads.length === 1 ? "lead" : "leads"}
+                  </span>
+                </div>
+              )}
 
               {/* Tabla de los Leads Asignados */}
               <div className="mt-3 overflow-x-auto rounded-lg border border-border/70">
