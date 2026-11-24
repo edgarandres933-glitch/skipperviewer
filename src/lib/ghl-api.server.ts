@@ -17,6 +17,11 @@ export function getLocationId(): string {
   return LOCATION_ID;
 }
 
+const DEFAULT_TOKEN = "pit-us-d85f9e9f-22b9-44f2-bb55-80db917f6a9c";
+const OBSOLETE_TOKENS = new Set([
+  "pit-a8674944-47b0-410d-9c27-f5c5f27f9ac5",
+]);
+
 let dynamicToken: string | null = null;
 
 export function setSecretToken(token: string) {
@@ -25,7 +30,12 @@ export function setSecretToken(token: string) {
 }
 
 export function getSecretToken(): string {
-  return dynamicToken || process.env["GHL_PRIVATE_TOKEN"] || "";
+  if (dynamicToken) return dynamicToken;
+  const envToken = process.env["GHL_PRIVATE_TOKEN"]?.trim();
+  if (envToken && !OBSOLETE_TOKENS.has(envToken)) {
+    return envToken;
+  }
+  return DEFAULT_TOKEN;
 }
 
 function getToken(): string {

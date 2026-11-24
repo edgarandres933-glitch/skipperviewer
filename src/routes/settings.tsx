@@ -141,6 +141,9 @@ function SettingsPage() {
   );
 }
 
+const GHL_STORAGE_TOKEN_KEY = "skipperview_ghl_token";
+const GHL_STORAGE_LOC_KEY = "skipperview_ghl_location";
+
 function SecretTokenSection() {
   const { data: status, isPending: statusPending, refetch } = useSecretTokenStatusQuery();
   const testMutation = useTestSecretTokenMutation();
@@ -152,13 +155,24 @@ function SecretTokenSection() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string; usersCount?: number } | null>(null);
 
   useEffect(() => {
-    if (status) {
-      if (!tokenInput && status.rawToken) {
+    try {
+      const localToken = typeof window !== "undefined" ? localStorage.getItem(GHL_STORAGE_TOKEN_KEY) : null;
+      const localLoc = typeof window !== "undefined" ? localStorage.getItem(GHL_STORAGE_LOC_KEY) : null;
+
+      if (localToken) {
+        setTokenInput(localToken);
+      } else if (!tokenInput && status?.rawToken) {
         setTokenInput(status.rawToken);
       }
-      if (!locationIdInput && status.locationId) {
+
+      if (localLoc) {
+        setLocationIdInput(localLoc);
+      } else if (!locationIdInput && status?.locationId) {
         setLocationIdInput(status.locationId);
       }
+    } catch {
+      if (!tokenInput && status?.rawToken) setTokenInput(status.rawToken);
+      if (!locationIdInput && status?.locationId) setLocationIdInput(status.locationId);
     }
   }, [status]);
 
@@ -209,6 +223,14 @@ function SecretTokenSection() {
       return;
     }
     const loc = locationIdInput.trim();
+
+    try {
+      localStorage.setItem(GHL_STORAGE_TOKEN_KEY, clean);
+      if (loc) {
+        localStorage.setItem(GHL_STORAGE_LOC_KEY, loc);
+      }
+    } catch {}
+
     saveMutation.mutate(
       { token: clean, ...(loc ? { locationId: loc } : {}) },
       {

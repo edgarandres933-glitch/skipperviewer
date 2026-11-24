@@ -16,22 +16,26 @@ const GHL_BASE = "https://services.leadconnectorhq.com";
  * Actualiza pares clave=valor en el archivo .env de forma persistente.
  */
 function updateEnvFile(updates: Record<string, string>) {
-  const envPath = path.resolve(process.cwd(), ".env");
-  let content = "";
-  if (fs.existsSync(envPath)) {
-    content = fs.readFileSync(envPath, "utf-8");
-  }
-
-  for (const [key, value] of Object.entries(updates)) {
-    const regex = new RegExp(`^${key}=.*$`, "m");
-    if (regex.test(content)) {
-      content = content.replace(regex, `${key}=${value}`);
-    } else {
-      content = content.trimEnd() + (content.length > 0 ? "\n" : "") + `${key}=${value}\n`;
+  try {
+    const envPath = path.resolve(process.cwd(), ".env");
+    let content = "";
+    if (fs.existsSync(envPath)) {
+      content = fs.readFileSync(envPath, "utf-8");
     }
-  }
 
-  fs.writeFileSync(envPath, content, "utf-8");
+    for (const [key, value] of Object.entries(updates)) {
+      const regex = new RegExp(`^${key}=.*$`, "m");
+      if (regex.test(content)) {
+        content = content.replace(regex, `${key}=${value}`);
+      } else {
+        content = content.trimEnd() + (content.length > 0 ? "\n" : "") + `${key}=${value}\n`;
+      }
+    }
+
+    fs.writeFileSync(envPath, content, "utf-8");
+  } catch (err) {
+    console.warn("No se pudo escribir en .env (entorno serverless o solo lectura):", err);
+  }
 }
 
 /**
