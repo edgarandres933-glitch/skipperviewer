@@ -169,6 +169,7 @@ function ConsolidadosPage() {
   const { data: dataset, isPending } = useDashboardQuery();
   const [selectedCourseKey, setSelectedCourseKey] = useState<string>("Marketing Digital");
   const [studentSearch, setStudentSearch] = useState("");
+  const [selectedAdvisorFilterForCourse, setSelectedAdvisorFilterForCourse] = useState<string>("all");
   const [selectedAdvisorName, setSelectedAdvisorName] = useState<string | null>(null);
   const [advisorLeadSearch, setAdvisorLeadSearch] = useState("");
   const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
@@ -493,12 +494,18 @@ function ConsolidadosPage() {
     );
   }, [consolidatedByCourse, selectedCourseKey]);
 
-  // Alumnos del curso seleccionado filtrados por el buscador
+  // Alumnos del curso seleccionado filtrados por el buscador y por asesor asignado
   const activeCourseStudents = useMemo(() => {
     if (!activeCourse) return [];
+    let list = activeCourse.students;
+
+    if (selectedAdvisorFilterForCourse !== "all") {
+      list = list.filter((s: any) => s.advisor === selectedAdvisorFilterForCourse);
+    }
+
     const q = studentSearch.toLowerCase().trim();
-    if (!q) return activeCourse.students;
-    return activeCourse.students.filter(
+    if (!q) return list;
+    return list.filter(
       (s: any) =>
         s.name.toLowerCase().includes(q) ||
         s.email.toLowerCase().includes(q) ||
@@ -507,7 +514,7 @@ function ConsolidadosPage() {
         s.modality.toLowerCase().includes(q) ||
         s.paymentStatus.toLowerCase().includes(q),
     );
-  }, [activeCourse, studentSearch]);
+  }, [activeCourse, studentSearch, selectedAdvisorFilterForCourse]);
 
   // Datos para la gráfica de barras de Facturación Recaudada vs Saldo por Cobrar
   const barChartData = useMemo(() => {
@@ -847,6 +854,11 @@ function ConsolidadosPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCourseKey(c.key);
+                            setSelectedAdvisorFilterForCourse("all");
+                            const el = document.getElementById("ficha-consolidada-curso");
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
                           }}
                         >
                           {isSelected ? "Seleccionado" : "Ver ficha"}
@@ -1365,7 +1377,7 @@ function ConsolidadosPage() {
       </div>
 
       {/* SECCIÓN 3: EXPEDIENTE / FICHA CONSOLIDADA DEL CURSO SELECCIONADO */}
-      <div className="mt-6">
+      <div id="ficha-consolidada-curso" className="mt-6 scroll-mt-6">
         {/* Selector de Pestañas de Cursos */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1">
@@ -1374,7 +1386,10 @@ function ConsolidadosPage() {
           {consolidatedByCourse.map((c) => (
             <button
               key={c.key}
-              onClick={() => setSelectedCourseKey(c.key)}
+              onClick={() => {
+                setSelectedCourseKey(c.key);
+                setSelectedAdvisorFilterForCourse("all");
+              }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all border",
                 selectedCourseKey === c.key
@@ -1466,7 +1481,19 @@ function ConsolidadosPage() {
               </h5>
               <div className="space-y-2">
                 {activeCourse.advisorsList.slice(0, 4).map((adv: any) => (
-                  <div key={adv.name} className="flex items-center justify-between text-xs">
+                  <div
+                    key={adv.name}
+                    onClick={() => {
+                      setSelectedAdvisorFilterForCourse(
+                        selectedAdvisorFilterForCourse === adv.name ? "all" : adv.name,
+                      );
+                    }}
+                    className={cn(
+                      "flex items-center justify-between text-xs p-1 rounded-md cursor-pointer transition-colors hover:bg-muted/60",
+                      selectedAdvisorFilterForCourse === adv.name && "bg-primary/15 font-semibold",
+                    )}
+                    title="Haz clic para filtrar los alumnos de este asesor"
+                  >
                     <span className="text-muted-foreground font-medium truncate max-w-[180px]">
                       {adv.name}
                     </span>
@@ -1522,10 +1549,41 @@ function ConsolidadosPage() {
                 <h5 className="font-semibold text-xs text-foreground">
                   Alumnos Inscritos en {activeCourse.label} ({activeCourseStudents.length})
                 </h5>
+                {selectedAdvisorFilterForCourse !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    Asignado a: {selectedAdvisorFilterForCourse}
+                    <button
+                      onClick={() => setSelectedAdvisorFilterForCourse("all")}
+                      className="hover:opacity-75 font-bold ml-0.5"
+                      title="Quitar filtro de asesor"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
               </div>
 
-              {/* Botón de exportar alumnos de este curso + Buscador */}
+              {/* Botón de exportar alumnos de este curso + Filtro por Asesor + Buscador */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Selector de Asignamiento (Asesor) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline">
+                    Asignado a:
+                  </span>
+                  <select
+                    value={selectedAdvisorFilterForCourse}
+                    onChange={(e) => setSelectedAdvisorFilterForCourse(e.target.value)}
+                    className="h-8 rounded-md border border-input bg-muted/40 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="all">Todos los asesores</option>
+                    {activeCourse.advisorsList.map((adv: any) => (
+                      <option key={adv.name} value={adv.name}>
+                        {adv.name} ({adv.won} {adv.won === 1 ? "alumno" : "alumnos"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <Button
                   onClick={() => handleExportSingleCourse(activeCourse)}
                   variant="outline"
@@ -1534,7 +1592,7 @@ function ConsolidadosPage() {
                   title={`Exportar listado de alumnos de ${activeCourse.label} a Excel`}
                 >
                   <FileSpreadsheet className="size-3.5" />
-                  <span>Exportar Alumnos ({activeCourse.label})</span>
+                  <span>Exportar Alumnos</span>
                 </Button>
 
                 {/* Buscador dentro del curso */}
