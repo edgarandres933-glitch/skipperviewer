@@ -49,6 +49,11 @@ import { toast } from "sonner";
 import { exportConsolidadosToExcel, exportSingleCourseToExcel } from "@/lib/export-excel";
 
 export const Route = createFileRoute("/consolidados")({
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      curso: typeof search.curso === "string" ? search.curso : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Consolidados por Curso — Skipper View" },
@@ -165,15 +170,32 @@ const KNOWN_COURSES = [
 ];
 
 function ConsolidadosPage() {
+  const search = Route.useSearch();
   const { range } = useDateRange();
   const { data: dataset, isPending } = useDashboardQuery();
-  const [selectedCourseKey, setSelectedCourseKey] = useState<string>("Marketing Digital");
+  const [selectedCourseKey, setSelectedCourseKey] = useState<string>(() => {
+    return search?.curso || "Marketing Digital";
+  });
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedAdvisorFilterForCourse, setSelectedAdvisorFilterForCourse] = useState<string>("all");
   const [selectedAdvisorName, setSelectedAdvisorName] = useState<string | null>(null);
   const [advisorLeadSearch, setAdvisorLeadSearch] = useState("");
   const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
   const [advisorCourseFilter, setAdvisorCourseFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (search?.curso) {
+      setSelectedCourseKey(search.curso);
+      setSelectedAdvisorFilterForCourse("all");
+      setStudentSearch("");
+      const el = document.getElementById("ficha-consolidada-curso");
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 150);
+      }
+    }
+  }, [search?.curso]);
 
   const allLeads = dataset?.leads ?? [];
 
@@ -219,7 +241,7 @@ function ConsolidadosPage() {
       const c = (courseName || "").toLowerCase();
       if (c.includes("marketing") || c.includes("mrk") || c.includes("tiktok")) return "Marketing Digital";
       if (c.includes("excel")) return "Excel Profesional";
-      if (c.includes("contable") || c.includes("asistent")) return "Asistente Contable";
+      if (c.includes("contable") || c.includes("asistent") || c.includes("cconta")) return "Asistente Contable";
       if (c.includes("ofimat") || c.includes("office") || c.includes("word")) return "Ofimática";
       if (c.includes("capcut") || c.includes("video") || c.includes("edicion") || c.includes("edición")) return "CapCut";
       if (
@@ -291,6 +313,7 @@ function ConsolidadosPage() {
         date: l.oppDate || l.date,
         advisor: advName,
         source: chName,
+        course: l.course || "General",
         modality: l.modality,
         paymentStatus: l.paymentStatus,
         paid,
@@ -873,6 +896,7 @@ function ConsolidadosPage() {
                             e.stopPropagation();
                             setSelectedCourseKey(c.key);
                             setSelectedAdvisorFilterForCourse("all");
+                            setStudentSearch("");
                             const el = document.getElementById("ficha-consolidada-curso");
                             if (el) {
                               el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1479,6 +1503,7 @@ function ConsolidadosPage() {
               onClick={() => {
                 setSelectedCourseKey(c.key);
                 setSelectedAdvisorFilterForCourse("all");
+                setStudentSearch("");
               }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all border",
@@ -1715,7 +1740,14 @@ function ConsolidadosPage() {
                   {activeCourseStudents.map((st: any) => (
                     <tr key={st.id} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2.5 px-3 font-medium text-foreground">
-                        <p className="font-semibold">{st.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-semibold">{st.name}</p>
+                          {activeCourse.key === "Otros Programas" && st.course && (
+                            <span className="rounded bg-sky-500/15 px-1.5 py-0.2 text-[9px] font-bold text-sky-600 dark:text-sky-400 border border-sky-500/25">
+                              {st.course}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-muted-foreground">{st.email || st.phone || "—"}</p>
                       </td>
                       <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px]">

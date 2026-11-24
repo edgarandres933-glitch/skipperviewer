@@ -500,6 +500,21 @@ function DashboardPage() {
                       </span>
                     </ExplainTooltip>
                   </div>
+
+                  {/* Botón de acceso directo a la ficha del curso */}
+                  <div className="pt-2.5 border-t border-border/40">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-7 text-[11px] gap-1 font-medium text-foreground hover:bg-primary hover:text-primary-foreground transition-all"
+                    >
+                      <Link to="/consolidados" search={{ curso: product.key }}>
+                        <span>Ver ficha consolidada</span>
+                        <ChevronRight className="size-3" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </div>
             );

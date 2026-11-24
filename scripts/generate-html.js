@@ -4,6 +4,26 @@ import { pathToFileURL } from "url";
 
 async function main() {
   try {
+    // Parchear server-*.js si contiene handleServerRoutes con matchedRoutes no-iterable
+    const serverAssetsDir = path.resolve("dist/server/assets");
+    if (fs.existsSync(serverAssetsDir)) {
+      const serverFiles = fs.readdirSync(serverAssetsDir);
+      for (const sf of serverFiles) {
+        if (sf.endsWith(".js")) {
+          const sfPath = path.join(serverAssetsDir, sf);
+          let sCode = fs.readFileSync(sfPath, "utf8");
+          if (sCode.includes("for (const route of matchedRoutes)")) {
+            sCode = sCode.replaceAll(
+              "for (const route of matchedRoutes)",
+              "for (const route of (Array.isArray(matchedRoutes) ? matchedRoutes : Object.values(matchedRoutes || {})))"
+            );
+            fs.writeFileSync(sfPath, sCode, "utf8");
+            console.log(`Parcheado handleServerRoutes en ${sf}`);
+          }
+        }
+      }
+    }
+
     const serverPath = pathToFileURL(path.resolve("dist/server/server.js")).href;
     const serverModule = await import(serverPath);
     const server = serverModule.default;
@@ -23,6 +43,18 @@ async function main() {
       const files = fs.readdirSync(assetsDir);
       const realIndexJs = files.find(f => /^index-.*\.js$/.test(f));
       const realStylesCss = files.find(f => /^styles-.*\.css$/.test(f));
+
+      // Sincronizar todos los chunks en html para que coincidan con los hashes reales de este build
+      for (const file of files) {
+        const lastDash = file.lastIndexOf("-");
+        if (lastDash > 0) {
+          const prefix = file.slice(0, lastDash);
+          const ext = path.extname(file);
+          const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`\\/assets\\/${escapedPrefix}-[A-Za-z0-9_-]+${ext.replace(".", "\\.")}`, "g");
+          html = html.replace(regex, `/assets/${file}`);
+        }
+      }
       
       if (realIndexJs) {
         console.log(`Detectado bundle principal: ${realIndexJs}`);
