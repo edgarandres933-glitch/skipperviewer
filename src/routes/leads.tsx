@@ -222,7 +222,7 @@ const MONTH_LABELS = [
   "Dic",
 ];
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 100;
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;

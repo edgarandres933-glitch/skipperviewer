@@ -27,6 +27,7 @@ import {
   BookOpen,
   Award,
   Search,
+  ChevronLeft,
   ChevronRight,
   ArrowUpRight,
   FileSpreadsheet,
@@ -182,6 +183,8 @@ function ConsolidadosPage() {
   const [advisorLeadSearch, setAdvisorLeadSearch] = useState("");
   const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
   const [advisorCourseFilter, setAdvisorCourseFilter] = useState<string>("all");
+  const [advisorLeadPage, setAdvisorLeadPage] = useState(1);
+  const ADVISOR_LEADS_PER_PAGE = 100;
 
   useEffect(() => {
     if (search?.curso) {
@@ -504,6 +507,13 @@ function ConsolidadosPage() {
         (l.source && l.source.toLowerCase().includes(q)),
     );
   }, [activeAdvisor, advisorLeadSearch, advisorStatusFilter, advisorCourseFilter]);
+
+  const totalAdvisorLeadPages = Math.max(1, Math.ceil(filteredAdvisorLeads.length / ADVISOR_LEADS_PER_PAGE));
+  const currentAdvisorLeadPage = Math.min(advisorLeadPage, totalAdvisorLeadPages);
+  const pagedAdvisorLeads = useMemo(() => {
+    const start = (currentAdvisorLeadPage - 1) * ADVISOR_LEADS_PER_PAGE;
+    return filteredAdvisorLeads.slice(start, start + ADVISOR_LEADS_PER_PAGE);
+  }, [filteredAdvisorLeads, currentAdvisorLeadPage]);
 
   // Totales de asesores consolidados
   const advisorTotals = useMemo(() => {
@@ -1086,6 +1096,9 @@ function ConsolidadosPage() {
                             e.stopPropagation();
                             setSelectedAdvisorName(adv.name);
                             setAdvisorCourseFilter("all");
+                            setAdvisorStatusFilter("all");
+                            setAdvisorLeadSearch("");
+                            setAdvisorLeadPage(1);
                             const el = document.getElementById("listado-leads-asesor");
                             if (el) {
                               el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1169,7 +1182,10 @@ function ConsolidadosPage() {
                     </span>
                     <select
                       value={advisorCourseFilter}
-                      onChange={(e) => setAdvisorCourseFilter(e.target.value)}
+                      onChange={(e) => {
+                        setAdvisorCourseFilter(e.target.value);
+                        setAdvisorLeadPage(1);
+                      }}
                       className="h-8 rounded-md border border-input bg-muted/40 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                       <option value="all">
@@ -1186,7 +1202,10 @@ function ConsolidadosPage() {
                   {/* Píldoras de filtro por estado */}
                   <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
                     <button
-                      onClick={() => setAdvisorStatusFilter("all")}
+                      onClick={() => {
+                        setAdvisorStatusFilter("all");
+                        setAdvisorLeadPage(1);
+                      }}
                       className={cn(
                         "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                         advisorStatusFilter === "all"
@@ -1197,7 +1216,10 @@ function ConsolidadosPage() {
                       Todos ({activeAdvisor.totalLeads})
                     </button>
                     <button
-                      onClick={() => setAdvisorStatusFilter("Ganado")}
+                      onClick={() => {
+                        setAdvisorStatusFilter("Ganado");
+                        setAdvisorLeadPage(1);
+                      }}
                       className={cn(
                         "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                         advisorStatusFilter === "Ganado"
@@ -1208,7 +1230,10 @@ function ConsolidadosPage() {
                       Ganados ({activeAdvisor.wonLeads})
                     </button>
                     <button
-                      onClick={() => setAdvisorStatusFilter("En proceso")}
+                      onClick={() => {
+                        setAdvisorStatusFilter("En proceso");
+                        setAdvisorLeadPage(1);
+                      }}
                       className={cn(
                         "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                         advisorStatusFilter === "En proceso"
@@ -1219,7 +1244,10 @@ function ConsolidadosPage() {
                       En Proceso ({activeAdvisor.inProgressLeads})
                     </button>
                     <button
-                      onClick={() => setAdvisorStatusFilter("Perdido")}
+                      onClick={() => {
+                        setAdvisorStatusFilter("Perdido");
+                        setAdvisorLeadPage(1);
+                      }}
                       className={cn(
                         "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                         advisorStatusFilter === "Perdido"
@@ -1236,7 +1264,10 @@ function ConsolidadosPage() {
                     <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                       value={advisorLeadSearch}
-                      onChange={(e) => setAdvisorLeadSearch(e.target.value)}
+                      onChange={(e) => {
+                        setAdvisorLeadSearch(e.target.value);
+                        setAdvisorLeadPage(1);
+                      }}
                       placeholder="Buscar por nombre, teléfono, curso..."
                       className="h-8 w-full rounded-md border border-input bg-muted/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
@@ -1252,7 +1283,10 @@ function ConsolidadosPage() {
                     <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
                       Curso: {advisorCourseFilter}
                       <button
-                        onClick={() => setAdvisorCourseFilter("all")}
+                        onClick={() => {
+                          setAdvisorCourseFilter("all");
+                          setAdvisorLeadPage(1);
+                        }}
                         className="hover:opacity-75 font-bold ml-0.5"
                         title="Quitar filtro de curso"
                       >
@@ -1264,7 +1298,10 @@ function ConsolidadosPage() {
                     <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
                       Estado: {advisorStatusFilter}
                       <button
-                        onClick={() => setAdvisorStatusFilter("all")}
+                        onClick={() => {
+                          setAdvisorStatusFilter("all");
+                          setAdvisorLeadPage(1);
+                        }}
                         className="hover:opacity-75 font-bold ml-0.5"
                         title="Quitar filtro de estado"
                       >
@@ -1276,7 +1313,10 @@ function ConsolidadosPage() {
                     <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
                       Búsqueda: &ldquo;{advisorLeadSearch}&rdquo;
                       <button
-                        onClick={() => setAdvisorLeadSearch("")}
+                        onClick={() => {
+                          setAdvisorLeadSearch("");
+                          setAdvisorLeadPage(1);
+                        }}
                         className="hover:opacity-75 font-bold ml-0.5"
                         title="Limpiar búsqueda"
                       >
@@ -1306,7 +1346,7 @@ function ConsolidadosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {filteredAdvisorLeads.map((lead: any) => (
+                    {pagedAdvisorLeads.map((lead: any) => (
                       <tr key={lead.id} className="hover:bg-muted/30 transition-colors">
                         <td className="py-2.5 px-3 font-medium text-foreground">
                           <p className="font-semibold">{lead.name}</p>
@@ -1372,6 +1412,42 @@ function ConsolidadosPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Paginación de 100 leads */}
+              {totalAdvisorLeadPages > 1 && (
+                <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                  <span>
+                    Mostrando {(currentAdvisorLeadPage - 1) * ADVISOR_LEADS_PER_PAGE + 1} a{" "}
+                    {Math.min(currentAdvisorLeadPage * ADVISOR_LEADS_PER_PAGE, filteredAdvisorLeads.length)} de{" "}
+                    {filteredAdvisorLeads.length} leads (Página {currentAdvisorLeadPage} de {totalAdvisorLeadPages})
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1"
+                      disabled={currentAdvisorLeadPage <= 1}
+                      onClick={() => setAdvisorLeadPage((p) => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      <span>Anterior</span>
+                    </Button>
+                    <span className="px-2 font-mono text-[11px] font-semibold text-foreground">
+                      {currentAdvisorLeadPage} / {totalAdvisorLeadPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1"
+                      disabled={currentAdvisorLeadPage >= totalAdvisorLeadPages}
+                      onClick={() => setAdvisorLeadPage((p) => Math.min(totalAdvisorLeadPages, p + 1))}
+                    >
+                      <span>Siguiente</span>
+                      <ChevronRight className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>
